@@ -45,3 +45,9 @@ export interface DetectionStats {
   /** 实时推理帧率 */
   fps: number;
 }
+
+/** 浏览器定位得到的经纬度（WGS84） */
+export interface GeoCoords {
+  latitude: number;
+  longitude: number;
+}

@@ -2,20 +2,37 @@
  * 抬头显示层（HUD）
  *
  * - 顶部：品牌标题、状态圆点、目标总数 N TARGETS、摄像头控制按钮
- * - 底部：方位角 / GPS 无信号；左下品牌水印；右下模型与实时 FPS
+ * - 底部：方位角 / 实时经纬度；左下品牌水印；右下模型与实时 FPS
  * 风格：半透明黑底白字，绿色强调色，无多余装饰动画
  */
 import { BRAND_NAME, GPS_STATUS_TEXT } from '../config';
-import type { CameraStatus } from '../types';
+import type { CameraStatus, GeoCoords } from '../types';
 
 interface HudProps {
   status: CameraStatus;
   targetCount: number;
   fps: number;
-  heading: number;
+  heading: number | null;
+  coords: GeoCoords | null;
   canSwitch: boolean;
   onToggleCamera: () => void;
   onSwitchCamera: () => void;
+}
+
+/** 方位角文案：无磁力计数据（如桌面浏览器）时以 -- 占位 */
+function formatHeading(heading: number | null): string {
+  if (heading === null) {
+    return '方位角 --';
+  }
+  return `方位角 ${heading.toFixed(1)}°`;
+}
+
+/** 经纬度文案：无有效定位时回退为无信号提示 */
+function formatCoords(coords: GeoCoords | null): string {
+  if (!coords) {
+    return GPS_STATUS_TEXT;
+  }
+  return `纬度 ${coords.latitude.toFixed(6)} 经度 ${coords.longitude.toFixed(6)}`;
 }
 
 /** 顶部状态圆点颜色随摄像头状态切换 */
@@ -34,6 +51,7 @@ export function Hud({
   targetCount,
   fps,
   heading,
+  coords,
   canSwitch,
   onToggleCamera,
   onSwitchCamera,
@@ -81,9 +99,9 @@ export function Hud({
         <div className="watermark">{BRAND_NAME}</div>
 
         <div className="telemetry">
-          <span>方位角 {heading.toFixed(1)}°</span>
+          <span>{formatHeading(heading)}</span>
           <span className="telemetry-divider" />
-          <span>{GPS_STATUS_TEXT}</span>
+          <span>{formatCoords(coords)}</span>
         </div>
 
         <div className="model-info">

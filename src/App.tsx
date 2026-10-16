@@ -12,6 +12,7 @@ import { DetectorStage } from './components/DetectorStage';
 import { Hud } from './components/Hud';
 import { useCamera } from './hooks/useCamera';
 import { useCompass } from './hooks/useCompass';
+import { useGeolocation } from './hooks/useGeolocation';
 import { buildDetections, renderDetections } from './lib/renderer';
 import { YoloV8Detector } from './lib/yoloDetector';
 import type { DetectionStats } from './types';
@@ -32,7 +33,8 @@ export default function App() {
   const [stats, setStats] = useState<DetectionStats>({ count: 0, fps: 0 });
 
   const { status, error, facing, canSwitch, start, stop, switchCamera } = useCamera(videoRef);
-  const heading = useCompass();
+  const { heading, requestPermission } = useCompass();
+  const coords = useGeolocation();
 
   // 模型加载（仅一次）：jsDelivr 加速直链，失败自动回退本地模型
   useEffect(() => {
@@ -154,12 +156,14 @@ export default function App() {
   }, [modelReady, status, facing]);
 
   const handleToggleCamera = useCallback(() => {
+    // 罗盘权限（iOS 13+）必须在用户手势内申请，否则方位角永远收不到传感器数据
+    void requestPermission();
     if (status === 'running') {
       stop();
     } else {
       void start();
     }
-  }, [start, status, stop]);
+  }, [requestPermission, start, status, stop]);
 
   const handleSwitchCamera = useCallback(() => {
     void switchCamera();
@@ -180,6 +184,7 @@ export default function App() {
           targetCount={stats.count}
           fps={stats.fps}
           heading={heading}
+          coords={coords}
           canSwitch={canSwitch}
           onToggleCamera={handleToggleCamera}
           onSwitchCamera={handleSwitchCamera}
