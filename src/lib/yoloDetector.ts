@@ -110,7 +110,9 @@ export class YoloV8Detector {
       if (value) {
         chunks.push(value);
         received += value.length;
-        onProgress?.(received / total);
+        // Content-Length 可能是压缩后大小（CDN 常返回 br/gzip），
+        // 而 reader 读出的是解压后字节，故比例需钳制在 1 以内
+        onProgress?.(Math.min(received / total, 1));
       }
     }
 

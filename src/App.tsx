@@ -167,6 +167,8 @@ export default function App() {
 
   const showLoadingModel = !modelReady && !modelError;
   const cameraOff = status === 'idle' || status === 'stopped';
+  /** 展示用加载百分比，钳制在 0~100 之间 */
+  const loadPercent = Math.min(100, Math.round(modelProgress * 100));
 
   return (
     <div className="app">
@@ -190,9 +192,9 @@ export default function App() {
           <div className="overlay-title">模型加载中</div>
           <div className="overlay-subtitle">YOLOv8n · ONNX Web 本地推理</div>
           <div className="progress-track">
-            <div className="progress-bar" style={{ width: `${Math.round(modelProgress * 100)}%` }} />
+            <div className="progress-bar" style={{ width: `${loadPercent}%` }} />
           </div>
-          <div className="overlay-progress">{Math.round(modelProgress * 100)}%</div>
+          <div className="overlay-progress">{loadPercent}%</div>
         </div>
       )}
 
