@@ -1,0 +1,331 @@
+/* ===== 全局重置 ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ===== 应用容器 ===== */
+.app {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  overflow: hidden;
+}
+
+/* ===== 视频与画布层 ===== */
+.stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.stage-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+
+.stage-video.is-mirrored {
+  transform: scaleX(-1);
+}
+
+.stage-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ===== HUD 公共 ===== */
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-top,
+.hud-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+}
+
+.hud-top {
+  top: 0;
+  gap: 16px;
+}
+
+.hud-bottom {
+  bottom: 0;
+  min-height: 64px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+}
+
+/* 品牌与状态圆点 */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 150px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #8a8a8a;
+  flex: none;
+}
+
+.status-dot.is-starting {
+  background: #ffb020;
+}
+
+.status-dot.is-running {
+  background: #00ff5e;
+}
+
+.brand-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+}
+
+/* 目标总数 */
+.target-count {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.target-number {
+  font-size: 22px;
+  font-weight: 700;
+  color: #00ff5e;
+  letter-spacing: 1px;
+}
+
+.target-unit {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* 顶部按钮组 */
+.top-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  min-width: 150px;
+  pointer-events: auto;
+}
+
+.hud-button {
+  padding: 7px 14px;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+  letter-spacing: 1px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.hud-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.hud-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hud-button.is-primary {
+  border-color: #00ff5e;
+  color: #00ff5e;
+}
+
+.hud-button.is-primary:hover:not(:disabled) {
+  background: rgba(0, 255, 94, 0.14);
+}
+
+.hud-button.is-danger {
+  border-color: rgba(255, 90, 90, 0.8);
+  color: #ff7a7a;
+}
+
+.hud-button.is-danger:hover:not(:disabled) {
+  background: rgba(255, 80, 80, 0.14);
+}
+
+/* 底部三栏 */
+.watermark {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.55);
+  min-width: 150px;
+}
+
+.telemetry {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.telemetry-divider {
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.model-info {
+  min-width: 150px;
+  text-align: right;
+  font-size: 12px;
+  line-height: 1.7;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+}
+
+.fps-value {
+  color: #00ff5e;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* ===== 居中遮罩 ===== */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.82);
+  text-align: center;
+  pointer-events: auto;
+}
+
+.overlay.is-compact {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.overlay-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.overlay-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 1px;
+}
+
+.overlay-error {
+  color: #ff7a7a;
+  max-width: 80vw;
+}
+
+.overlay-progress {
+  font-size: 14px;
+  color: #00ff5e;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-track {
+  width: 240px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: #00ff5e;
+}
+
+/* ===== 移动端适配 ===== */
+@media (max-width: 640px) {
+  .hud-top,
+  .hud-bottom {
+    padding: 10px 14px;
+  }
+
+  .brand,
+  .top-actions,
+  .watermark,
+  .model-info {
+    min-width: auto;
+  }
+
+  .brand-name {
+    font-size: 15px;
+  }
+
+  .target-number {
+    font-size: 18px;
+  }
+
+  .hud-button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .telemetry {
+    position: static;
+    transform: none;
+  }
+
+  .model-info {
+    display: none;
+  }
+}
