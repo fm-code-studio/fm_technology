@@ -15,8 +15,21 @@ export const MODEL_CDN_URLS: readonly string[] = [
 /** 本地兜底模型（所有 CDN 不可用时使用，支持纯内网/离线部署） */
 export const MODEL_FALLBACK_URL = '/models/yolov8n.onnx';
 
-/** onnxruntime-web wasm 文件目录（已随站点发布到 /ort/） */
+/** 本地 wasm 运行时目录（离线/内网离线部署兜底） */
 export const ORT_WASM_PATHS = '/ort/';
+
+/**
+ * jsDelivr 上 onnxruntime-web 的 dist 目录路径，拼接在 CDN 主机之后使用。
+ * 原因：Netlify 默认域名在部分网络下传输大文件会被截断（实测约 2MB 即中断），
+ * 11MB 的 wasm 运行时必须改走 jsDelivr，本地文件仅作为兜底。
+ */
+export const ORT_CDN_DIST_PATH = '/npm/onnxruntime-web@1.19.2/dist/';
+
+/** 单次下载在无数据到达时的停顿超时（毫秒），用于快速跳过被阻断/停滞的节点 */
+export const FETCH_STALL_TIMEOUT_MS = 10_000;
+
+/** 单次下载总时长上限（毫秒） */
+export const FETCH_TOTAL_TIMEOUT_MS = 300_000;
 
 /** YOLOv8 输入尺寸（正方形） */
 export const MODEL_INPUT_SIZE = 640;

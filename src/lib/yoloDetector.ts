@@ -9,10 +9,13 @@
 import * as ort from 'onnxruntime-web';
 import {
   CONFIDENCE_THRESHOLD,
+  FETCH_STALL_TIMEOUT_MS,
+  FETCH_TOTAL_TIMEOUT_MS,
   IOU_THRESHOLD,
   MODEL_CDN_URLS,
   MODEL_FALLBACK_URL,
   MODEL_INPUT_SIZE,
+  ORT_CDN_DIST_PATH,
   ORT_WASM_PATHS,
   PERSON_CLASS_ID,
 } from '../config';
@@ -29,12 +32,9 @@ export class YoloV8Detector {
   private readonly context: CanvasRenderingContext2D;
 
   constructor() {
-    // 指定 wasm 运行时路径（随站点发布，不需要访问 CDN）
-    ort.env.wasm.wasmPaths = ORT_WASM_PATHS;
-    // 跨源隔离生效时启用多线程推理（COOP/COEP 响应头已在 vite 与 Netlify 配置）
-    if (typeof window !== 'undefined' && window.crossOriginIsolated) {
-      ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency || 1);
-    }
+    // 固定单线程：该模型在 CPU 上的多线程推理并无收益（实测 4 线程与 1 线程耗时相当），
+    // 且线程化 wasm 构建在实例化时会触发流式编译降级告警
+    ort.env.wasm.numThreads = 1;
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = MODEL_INPUT_SIZE;
@@ -52,7 +52,12 @@ export class YoloV8Detector {
   }
 
   /**
-   * 加载模型：优先 jsDelivr 国内加速直链，失败后回退本地 /models 目录
+   * 加载模型
+   *
+   * 顺序：jsDelivr 各加速节点 -> 本地 /models 兜底。
+   * 同时依据模型实际来源决定 wasm 运行时的加载位置：
+   * 走 CDN 时 wasm 也取自同一 jsDelivr 主机（Netlify 无法稳定传输大文件），
+   * 走本地兜底时 wasm 取自同站 /ort/。
    */
   async load(onProgress?: LoadProgressCallback): Promise<void> {
     if (this.session) {
@@ -60,11 +65,13 @@ export class YoloV8Detector {
     }
 
     let buffer: ArrayBuffer | null = null;
+    let wasmPaths = ORT_WASM_PATHS;
 
     // 依次尝试 jsDelivr 各加速节点
     for (const url of MODEL_CDN_URLS) {
       try {
         buffer = await this.fetchModel(url, onProgress);
+        wasmPaths = new URL(url).origin + ORT_CDN_DIST_PATH;
         break;
       } catch (cdnError) {
         console.warn(`模型节点加载失败：${url}`, cdnError);
@@ -77,6 +84,8 @@ export class YoloV8Detector {
       buffer = await this.fetchModel(MODEL_FALLBACK_URL, onProgress);
     }
 
+    ort.env.wasm.wasmPaths = wasmPaths;
+
     this.session = await ort.InferenceSession.create(buffer, {
       executionProviders: ['wasm'],
       graphOptimizationLevel: 'all',
@@ -84,45 +93,79 @@ export class YoloV8Detector {
     onProgress?.(1);
   }
 
-  /** 下载模型文件并回报下载进度 */
+  /**
+   * 下载模型文件并回报下载进度
+   *
+   * 带两级超时保护，避免被阻断或停滞的节点把加载永久卡住：
+   * - 停顿超时：连续超过 FETCH_STALL_TIMEOUT_MS 没有收到新数据即中止
+   * - 总时长上限：超过 FETCH_TOTAL_TIMEOUT_MS 直接中止
+   * 同时对响应长度做校验，把被截断的响应识别为失败，交给下一个来源重试。
+   */
   private async fetchModel(url: string, onProgress?: LoadProgressCallback): Promise<ArrayBuffer> {
-    const response = await fetch(url, { mode: 'cors' });
-    if (!response.ok) {
-      throw new Error(`模型下载失败：HTTP ${response.status} ${url}`);
-    }
+    const controller = new AbortController();
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    let totalTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const total = Number(response.headers.get('content-length') ?? 0);
-    if (!response.body || total <= 0) {
-      // 无法获取流式进度时直接整体下载
-      const arrayBuffer = await response.arrayBuffer();
-      onProgress?.(1);
-      return arrayBuffer;
-    }
+    /** 重新计时：只要还在持续收到数据就不断延后停顿判定 */
+    const armStallTimer = (): void => {
+      clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => controller.abort(), FETCH_STALL_TIMEOUT_MS);
+    };
+    const clearTimers = (): void => {
+      clearTimeout(stallTimer);
+      clearTimeout(totalTimer);
+    };
 
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
+    totalTimer = setTimeout(() => controller.abort(), FETCH_TOTAL_TIMEOUT_MS);
+    armStallTimer();
+
+    try {
+      const response = await fetch(url, { mode: 'cors', signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} ${url}`);
       }
-      if (value) {
-        chunks.push(value);
-        received += value.length;
-        // Content-Length 可能是压缩后大小（CDN 常返回 br/gzip），
-        // 而 reader 读出的是解压后字节，故比例需钳制在 1 以内
-        onProgress?.(Math.min(received / total, 1));
-      }
-    }
 
-    const result = new Uint8Array(received);
-    let offset = 0;
-    for (const chunk of chunks) {
-      result.set(chunk, offset);
-      offset += chunk.length;
+      const total = Number(response.headers.get('content-length') ?? 0);
+      if (!response.body || total <= 0) {
+        // 无法获取长度时直接整体下载，交由总时长上限保护
+        const arrayBuffer = await response.arrayBuffer();
+        onProgress?.(1);
+        return arrayBuffer;
+      }
+
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        armStallTimer();
+        if (value) {
+          chunks.push(value);
+          received += value.length;
+          // Content-Length 可能是压缩后大小（CDN 常返回 br/gzip），
+          // 而 reader 读出的是解压后字节，故比例需钳制在 1 以内
+          onProgress?.(Math.min(received / total, 1));
+        }
+      }
+
+      // 长度不足说明传输被截断（部分网络下大文件会被中途切断），判定为失败
+      if (received < total) {
+        throw new Error(`响应被截断：${received}/${total} ${url}`);
+      }
+
+      const result = new Uint8Array(received);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return result.buffer;
+    } finally {
+      clearTimers();
     }
-    return result.buffer;
   }
 
   /**
